@@ -13,18 +13,18 @@ const clinicImages = [
 
 const therapists = [
   {
-    name: 'Psicóloga Lastênia Soares',
+    name: 'Psicóloga Lastênia Soares de Lima',
     role: 'CRP – 11/0998',
     image: '/Lastenia.jpg',
-    description: 'Texto para descrever a formação, experiência e abordagem terapêutica da psicóloga Lastênia Soares.',
-    whatsapp: 'https://wa.me/5585999990001',
-    tags: ['Adulto', 'Casal']
+    description: 'Olá, sou Lastênia Soares de Lima, psicóloga, gestalt-terapeuta, mestre em Educação, especialista em mediação de conflitos e diretora da Clínica EntreSer. Formei-me em Psicologia em 1993 e, desde então, meu trabalho tem sido orientado pela abordagem gestáltica, compreendendo-a como um modo de entender o mundo, as pessoas e os vínculos sociais constituídos. Atendo jovens, adultos, idosos, casais e famílias. Sou facilitadora de processos grupais, professora em institutos de formação em Gestalt-terapia, supervisora clínica e consultora em Psicologia Social na área de prevenção e proteção de crianças, adolescentes e famílias em situação de vulnerabilidade social. Um dos aspectos centrais, para mim, no processo psicoterápico é a relação estabelecida entre as pessoas envolvidas nesse processo, psicoterapeuta e paciente, compreendendo esse “entre” como uma dinâmica fluida de contatos voltada para a construção de ajustamentos saudáveis na relação entre eu e o outro, eu e o mundo.',
+    whatsapp: 'https://wa.me/5585996189558',
+    tags: ['Adulto', 'Jovens', 'Idosos', 'Casais', 'Famílias']
   },
   {
     name: 'Psicóloga Silvia Barbosa Correia',
     role: 'CRP – 11/1269',
     image: '/Silvia.png',
-    description: 'Olá, me chamo Silvia Barbosa Correia, sou psicóloga (CRP – 11/1269), Gestalt terapeuta, Doutora em Psicologia, Mestre em Avaliação de Políticas Públicas e Especialista em Psicologia Aplicada. A  Gestal Terapia, abordagem que fundamenta minha atuação, se apresenta pra mim, como possibilidade de um encontro entre terapeuta e paciente, que juntos através de uma relação pautada na presença e no diálogo, vão olhar para as questões trazidas pelo paciente que merecem cuidado e que, de alguma forma, estejam causando sofrimento psíquico, no sentido de construir novas possibilidades de existir. Também desenvolvo supervisão clínica na perspectiva gestáltica com profissionais de psicologia que tenham como demanda um olhar técnico, ético e reflexivo sobre casos clínicos e/ou situações de prática profissional.',
+    description: 'Olá, me chamo Silvia Barbosa Correia, sou psicóloga (CRP 11/1269), gestalt-terapeuta, doutora em Psicologia, mestre em Avaliação de Políticas Públicas e especialista em Psicologia Aplicada. A Gestalt-terapia, abordagem que fundamenta minha atuação, apresenta-se para mim como a possibilidade de um encontro entre terapeuta e paciente, que, juntos, por meio de uma relação pautada na presença e no diálogo, irão olhar para as questões trazidas pelo paciente que merecem cuidado e que, de alguma forma, estejam causando sofrimento psíquico, buscando construir novas possibilidades de existir. Também desenvolvo supervisão clínica na perspectiva gestáltica com profissionais de Psicologia que tenham como demanda um olhar técnico, ético e reflexivo sobre casos clínicos e/ou situações da prática profissional.',
     whatsapp: 'https://wa.me/5585981417741',
     tags: ['Adulto', 'Casal']
   },
@@ -32,6 +32,7 @@ const therapists = [
 
 export default function App() {
   const [currentClinicImage, setCurrentClinicImage] = useState(0)
+  const [expandedTherapists, setExpandedTherapists] = useState({})
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -47,6 +48,13 @@ export default function App() {
 
   const showNextClinicImage = () => {
     setCurrentClinicImage((current) => (current + 1) % clinicImages.length)
+  }
+
+  const toggleTherapistDescription = (name) => {
+    setExpandedTherapists((current) => ({
+      ...current,
+      [name]: !current[name],
+    }))
   }
 
   return (
@@ -174,7 +182,29 @@ profissionais de Psicologia
                   <div>
                     <h3 className="font-['Playfair_Display'] text-3xl text-[#5f746c] mb-1">{therapist.name}</h3>
                     <p className="text-[#76A88E] mb-4">{therapist.role}</p>
-                    <p className="text-[#7a8782] leading-7 max-w-3xl">{therapist.description}</p>
+                    <p
+                      className="text-[#7a8782] leading-7 max-w-3xl"
+                      style={
+                        expandedTherapists[therapist.name]
+                          ? undefined
+                          : {
+                              display: '-webkit-box',
+                              WebkitLineClamp: 4,
+                              WebkitBoxOrient: 'vertical',
+                              overflow: 'hidden',
+                            }
+                      }
+                    >
+                      {therapist.description}
+                    </p>
+
+                    <button
+                      type="button"
+                      onClick={() => toggleTherapistDescription(therapist.name)}
+                      className="mt-3 text-sm font-semibold text-[#76A88E] hover:text-[#5f746c] transition"
+                    >
+                      {expandedTherapists[therapist.name] ? 'Mostrar menos' : 'Ler mais'}
+                    </button>
                   </div>
 
                   <a
@@ -286,7 +316,7 @@ profissionais de Psicologia
           </div>
 
           <img
-            src="/faça-parte.jpg"
+            src="/faça-parte.jpeg"
             className="h-full w-full object-cover min-h-[500px]"
           />
         </div>
