@@ -1,3 +1,4 @@
+import React from "react";
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { BookOpen, ChevronLeft, ChevronRight, HeartHandshake, Instagram, MapPin, MessageCircle, UsersRound } from 'lucide-react'
@@ -62,8 +63,8 @@ export default function App() {
 
           <div className="hidden md:flex items-center gap-10 text-sm font-medium">
             <a href="#inicio" className="hover:text-[#76A88E] transition">INÍCIO</a>
-            <a href="#terapeutas" className="hover:text-[#76A88E] transition">TERAPEUTAS</a>
-            <a href="#formacao" className="hover:text-[#76A88E] transition">FORMAÇÃO</a>
+            <a href="#terapeutas" className="hover:text-[#76A88E] transition">PSICOTERAPEUTAS</a>
+            <a href="#formacao" className="hover:text-[#76A88E] transition">FORMAÇÃO</a> 
             <a href="#faca-parte" className="hover:text-[#76A88E] transition">FAÇA PARTE</a>
           </div>
         </div>
@@ -150,7 +151,7 @@ profissionais de Psicologia
 
       <section id="terapeutas" className="py-20 px-6">
         <div className="max-w-7xl mx-auto text-center mb-14">
-          <h2 className="font-['Playfair_Display'] text-5xl text-[#5f746c] mb-4">Nossos Terapeutas</h2>
+          <h2 className="font-['Playfair_Display'] text-5xl text-[#5f746c] mb-4">Nossas(os) Psicoterapeutas</h2>
           <p className="text-[#7a8782] max-w-2xl mx-auto text-lg">
             Profissionais preparados para oferecer um atendimento humano, ético e acolhedor.
           </p>
