@@ -18,7 +18,7 @@ const therapists = [
     image: '/Lastenia.jpg',
     description: 'Olá, sou Lastênia Soares de Lima, psicóloga, gestalt-terapeuta, mestre em Educação, especialista em mediação de conflitos e diretora da Clínica EntreSer. Formei-me em Psicologia em 1993 e, desde então, meu trabalho sempre foi orientado pela abordagem gestáltica, entendendo-a como um modo de compreender o mundo, as pessoas e os vínculos sociais constituídos. Com formação também especializada nesse público, atendo adolescentes, jovens, adultos, idosos, casais e famílias. Sou facilitadora de processos grupais, professora em institutos de formação em Gestalt-terapia, supervisora clínica e consultora em Psicologia Social na área de prevenção e proteção de crianças, adolescentes e famílias em situações de vulnerabilidade social. Um dos aspectos centrais para mim sobre o processo psicoterápico é a relação estabelecida entre as pessoas envolvidas nesse processo (psicoterapeuta e paciente), compreendendo esse ENTRE como uma dinâmica fluida de contatos para a construção de ajustamentos saudáveis na relação eu-outro e eu-mundo.',
     whatsapp: 'https://wa.me/5585996189558',
-    tags: ['Adulto', 'Jovens', 'Idosos', 'Casais', 'Famílias']
+    tags: ['Adultos', 'Jovens', 'Idosos', 'Casais', 'Famílias']
   },
   {
     name: 'Psicóloga Silvia Barbosa Correia',
@@ -26,7 +26,7 @@ const therapists = [
     image: '/Silvia.png',
     description: 'Olá, me chamo Silvia Barbosa Correia, sou psicóloga (CRP 11/1269), gestalt-terapeuta, doutora em Psicologia, mestre em Avaliação de Políticas Públicas e especialista em Psicologia Aplicada. A Gestalt-terapia, abordagem que fundamenta minha atuação, apresenta-se para mim como a possibilidade de um encontro entre terapeuta e paciente, que, juntos, por meio de uma relação pautada na presença e no diálogo, irão olhar para as questões trazidas pelo paciente que merecem cuidado e que, de alguma forma, estejam causando sofrimento psíquico, buscando construir novas possibilidades de existir. Também desenvolvo supervisão clínica na perspectiva gestáltica com profissionais de Psicologia que tenham como demanda um olhar técnico, ético e reflexivo sobre casos clínicos e/ou situações da prática profissional.',
     whatsapp: 'https://wa.me/5585981417741',
-    tags: ['']
+    tags: ['Jovens a partir de 18 anos', 'Adultos', 'Idosos']
   },
   {
     name: 'Psicóloga Paloma Roberta Silva Souza',
@@ -34,15 +34,15 @@ const therapists = [
     image: '/Paloma.jpeg',
     description: 'Me chamo Paloma Roberta, graduada em Psicologia pela Universidade de Fortaleza. Aprofundei meus estudos por meio da formação em Gestalt-Terapia com crianças e adolescentes pelo Centro Gestáltico de Fortaleza e da especialização em Gestalt-Terapia pelo Instituto Gestalt do Ceará. Em paralelo à clínica, também estive dedicada à área escolar como psicóloga educacional. Sou psicoterapeuta há 7 anos, e foi através da Gestalt-Terapia e do trabalho com crianças e adolescentes que consegui aperfeiçoar minha prática e olhar para além do que está na superfície. Por meio de uma maneira mais autêntica e consciente, é possível perceber o quão significativo é o aqui e agora, a genuinidade das nossas experiências e como elas podem traduzir nossa forma de ser no mundo. Esses aspectos apenas reafirmam o quanto esse suporte é potente dentro do processo de desenvolvimento. A infância é um chão que pisamos a vida inteira!',
     whatsapp: 'https://wa.me/5585986321467',
-    tags: ['']
+    tags: ['Crianças a partir de 3 anos', 'Adolescentes', 'Jovens']
   },
   {
     name: 'Psicólogo Antonio Joelmir Portela da Silva',
     role: 'CRP – 11/20926',
     image: '/Joelmir.jpeg',
     description: 'Olá! Eu sou Joelmir, psicólogo formado pela Universidade Federal do Piauí (UFPI), doutorando em Psicologia pela Universidade Federal do Ceará (UFC) e mestre em Psicologia pela Universidade Federal do Delta do Parnaíba (UFDPAR). Tenho formação clínica em Gestalt-terapia com casais e famílias, além de formação em Gestalt-terapia com crianças e adolescentes. A Psicologia e a Gestalt-terapia sempre me fizeram perceber o mundo com uma curiosidade singular, suficiente para despertar em mim o interesse em estudar, pesquisar e ensinar esse ofício tão delicado que é a escuta e a clínica psicológica. A Gestalt-terapia é um convite ao reconhecimento das nossas singularidades, facilitando que possamos assumir quem somos, reverenciando nossa experiência de vida e percebendo as possibilidades de futuro a partir do presente. Sou professor universitário, com interesse em estudos relacionados à Saúde Coletiva, Saúde Mental, Psicologia da Saúde, vínculos íntimos, saúde voltada a grupos em situação de vulnerabilidade e intervenções psicossociais. Na clínica, atendo adolescentes a partir dos 16 anos, adultos, casais e famílias. Também facilito supervisão individual e em grupo para psicoterapeutas.',
-    whatsapp: 'https://wa.me/5585999969889',
-    tags: ['Jovens a partir de 16 anos', 'Adulto', 'Casais', 'Famílias']
+    whatsapp: 'https://wa.me/5585999698889',
+    tags: ['Jovens a partir de 16 anos', 'Adultos', 'Casais', 'Famílias']
   },
 ]
 
@@ -120,7 +120,7 @@ profissionais de Psicologia
 
             <div className="flex flex-wrap gap-4">
               <a href="#terapeutas" className="bg-[#76A88E] text-white px-7 py-4 rounded-full hover:scale-105 transition">
-                Conheça os terapeutas
+                Conheça os psicoterapeutas
               </a>
             </div>
           </motion.div>
@@ -323,7 +323,7 @@ profissionais de Psicologia
             </p>
 
             <a
-              href="https://wa.me/5500000000000"
+              href="https://wa.me/+5585996189558"
               className="w-fit bg-[#76A88E] text-white px-8 py-5 rounded-full flex items-center gap-3 hover:scale-105 transition"
             >
               <MessageCircle size={20} />
