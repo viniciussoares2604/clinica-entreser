@@ -1,7 +1,30 @@
 import React from "react";
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { BookOpen, ChevronLeft, ChevronRight, HeartHandshake, Instagram, MapPin, MessageCircle, UsersRound } from 'lucide-react'
+import {
+  ArrowLeft,
+  BookOpen,
+  CalendarDays,
+  CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
+  Copy,
+  Clock,
+  CreditCard,
+  HeartHandshake,
+  Instagram,
+  MapPin,
+  MessageCircle,
+  RefreshCw,
+  Send,
+  UserPlus,
+  UsersRound,
+} from 'lucide-react'
+import {
+  createMonthlyPixEnrollment,
+  createStudyGroupEnrollment,
+  listActiveStudyGroups,
+} from './services/studyGroupsService'
 
 const clinicImages = [
   '/principal.jpg',
@@ -46,9 +69,49 @@ const therapists = [
   },
 ]
 
+const currencyFormatter = new Intl.NumberFormat('pt-BR', {
+  style: 'currency',
+  currency: 'BRL',
+})
+
+const dateFormatter = new Intl.DateTimeFormat('pt-BR', {
+  day: '2-digit',
+  month: 'long',
+  year: 'numeric',
+})
+
+const clinicWhatsappNumber = '5585996189558'
+const clinicPixKey = '85996189558'
+
+function formatPrice(priceInCents) {
+  return currencyFormatter.format(priceInCents / 100)
+}
+
+function formatDate(date) {
+  return dateFormatter.format(new Date(`${date}T12:00:00`))
+}
+
+function getInstallmentCount(group) {
+  if (group?.installmentCount) return group.installmentCount
+  if (group?.id === 'self-da-situacao-gestalt-2026') return 5
+  if (group?.id === 'psicopatologia-critica-gestalt-fenomenologia-2026') return 4
+  return 1
+}
+
+function getCardTotalInCents(group) {
+  return group.priceInCents * getInstallmentCount(group)
+}
+
+function formatInstallmentLabel(group) {
+  const installments = getInstallmentCount(group)
+
+  return `${installments}x de ${formatPrice(group.priceInCents)} sem juros`
+}
+
 export default function App() {
   const [currentClinicImage, setCurrentClinicImage] = useState(0)
   const [expandedTherapists, setExpandedTherapists] = useState({})
+  const [currentPath, setCurrentPath] = useState(window.location.pathname)
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -57,6 +120,25 @@ export default function App() {
 
     return () => window.clearInterval(interval)
   }, [])
+
+  useEffect(() => {
+    const handleNavigation = () => setCurrentPath(window.location.pathname)
+    window.addEventListener('popstate', handleNavigation)
+
+    return () => window.removeEventListener('popstate', handleNavigation)
+  }, [])
+
+  if (currentPath === '/grupos-de-estudos') {
+    return <StudyGroupsPage />
+  }
+
+  if (currentPath === '/inscricao-confirmada') {
+    return <EnrollmentConfirmationPage />
+  }
+
+  if (currentPath === '/pagamento-pix-mensal') {
+    return <MonthlyPixPaymentPage />
+  }
 
   const showPreviousClinicImage = () => {
     setCurrentClinicImage((current) => (current - 1 + clinicImages.length) % clinicImages.length)
@@ -295,13 +377,11 @@ profissionais de Psicologia
             </p>
 
             <a
-              href="https://wa.me/5585996189558"
-              target="_blank"
-              rel="noreferrer"
+              href="/grupos-de-estudos"
               className="mt-auto w-fit bg-[#76A88E] text-white px-7 py-4 rounded-full flex items-center gap-3 hover:scale-105 transition"
             >
-              <MessageCircle size={20} />
-              Tenho interesse
+              <BookOpen size={20} />
+              Ver grupos ativos
             </a>
           </motion.div>
         </div>
@@ -385,5 +465,708 @@ profissionais de Psicologia
         </div>
       </footer>
     </div>
+  )
+}
+
+function StudyGroupsPage() {
+  const [studyGroups, setStudyGroups] = useState([])
+  const [selectedGroup, setSelectedGroup] = useState(null)
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    participantType: '',
+    professionalDocument: '',
+    paymentMethod: '',
+  })
+  const [enrollmentStatus, setEnrollmentStatus] = useState('idle')
+  const [checkoutMessage, setCheckoutMessage] = useState('')
+
+  useEffect(() => {
+    listActiveStudyGroups().then(setStudyGroups)
+  }, [])
+
+  const openEnrollment = (group) => {
+    setSelectedGroup(group)
+    setEnrollmentStatus('idle')
+    setCheckoutMessage('')
+  }
+
+  const closeEnrollment = () => {
+    setSelectedGroup(null)
+    setEnrollmentStatus('idle')
+    setCheckoutMessage('')
+  }
+
+  const updateFormData = (event) => {
+    const { name, value } = event.target
+    setFormData((current) => ({ ...current, [name]: value }))
+  }
+
+  const submitEnrollment = async (event) => {
+    event.preventDefault()
+    if (!selectedGroup) return
+
+    setEnrollmentStatus('saving')
+    setCheckoutMessage('')
+
+    try {
+      const participantTypeLabel =
+        formData.participantType === 'psychology_professional'
+          ? 'Profissional de Psicologia'
+          : 'Estudante'
+      const participant = {
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        professionalProfile: `${participantTypeLabel} - CRP ou Semestre: ${formData.professionalDocument}`,
+      }
+
+      if (formData.paymentMethod === 'monthly_pix') {
+        const pixEnrollment = await createMonthlyPixEnrollment({
+          studyGroup: selectedGroup,
+          participant,
+        })
+        const pixUrl = `/pagamento-pix-mensal?enrollment=${encodeURIComponent(
+          pixEnrollment.enrollmentId,
+        )}&group=${encodeURIComponent(pixEnrollment.studyGroupTitle)}&amount=${encodeURIComponent(
+          pixEnrollment.amountInCents,
+        )}`
+
+        window.location.href = pixUrl
+        return
+      }
+
+      const checkout = await createStudyGroupEnrollment({
+        studyGroup: selectedGroup,
+        participant,
+      })
+
+      if (checkout.checkoutUrl) {
+        const confirmationUrl = `/inscricao-confirmada?enrollment=${encodeURIComponent(
+          checkout.enrollmentId,
+        )}&checkout=${encodeURIComponent(checkout.checkoutUrl)}`
+        window.location.href = confirmationUrl
+        return
+      }
+
+      setEnrollmentStatus('saved')
+      setCheckoutMessage('Sua inscrição foi registrada. O checkout será aberto em instantes.')
+    } catch (error) {
+      setEnrollmentStatus('idle')
+      setCheckoutMessage(error.message || 'Não foi possível iniciar sua inscrição. Tente novamente.')
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-[#F8F7F4] text-[#4E5C57]">
+      <nav className="sticky top-0 z-50 backdrop-blur-md bg-white/75 border-b border-[#dce5dd]">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+          <a href="/" className="flex items-center gap-3">
+            <img src="/logo.jpeg" className="w-12 h-12 rounded-full object-cover" />
+            <div>
+              <h1 className="font-['Playfair_Display'] text-2xl text-[#76A88E]">EntreSer</h1>
+              <p className="text-xs tracking-[0.2em] uppercase text-[#7d8d87]">Clínica de Psicologia</p>
+            </div>
+          </a>
+
+          <a href="/" className="hidden sm:flex items-center gap-2 text-sm font-semibold text-[#5f746c] hover:text-[#76A88E] transition">
+            <ArrowLeft size={18} />
+            Voltar para o site
+          </a>
+        </div>
+      </nav>
+
+      <main>
+        <section className="px-6 pt-16 pb-12">
+          <div className="max-w-7xl mx-auto">
+            <motion.div initial={{ opacity: 0, y: 28 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.8 }}>
+              <span className="bg-[#EED9C8] text-[#6f7f79] px-4 py-2 rounded-full text-sm inline-block mb-6">
+                Grupos ativos para inscrição
+              </span>
+
+              <h2 className="font-['Playfair_Display'] text-5xl lg:text-7xl leading-tight text-[#5f746c] mb-6">
+                Grupos de Estudos e Cursos
+              </h2>
+
+              <p className="text-lg leading-8 text-[#73827c] max-w-2xl">
+                Encontros formativos para aprofundar leituras, ampliar repertórios clínicos e sustentar trocas entre estudantes e profissionais da Psicologia. Acompanhe os grupos disponíveis, escolha o percurso de estudo desejado e realize sua inscrição pelo site.
+              </p>
+            </motion.div>
+          </div>
+        </section>
+
+        <section className="px-6 pb-24">
+          <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-7">
+            {studyGroups.map((group) => (
+              <motion.article
+                key={group.id}
+                initial={{ opacity: 0, y: 22 }}
+                animate={{ opacity: 1, y: 0 }}
+                whileHover={{ y: -5 }}
+                className="bg-white/80 border border-white shadow-lg rounded-[28px] p-8 flex flex-col"
+              >
+                {group.bannerImage && (
+                  <img
+                    src={group.bannerImage}
+                    alt=""
+                    className="mb-7 w-full rounded-[20px] object-contain border border-[#e5ece7] bg-[#F8F7F4]"
+                    style={{ objectPosition: group.bannerPosition || 'center top' }}
+                  />
+                )}
+
+                <h3 className="font-['Playfair_Display'] text-4xl text-[#5f746c] mb-3">{group.title}</h3>
+                <p className="text-[#7a8782] leading-7 mb-6">{group.subtitle}</p>
+
+                <div className="grid sm:grid-cols-2 gap-4 mb-7">
+                  <DetailItem icon={CalendarDays} label="Início" value={formatDate(group.startsAt)} />
+                  <DetailItem icon={Clock} label="Duração" value={group.duration} />
+                  <DetailItem icon={UsersRound} label="Formato" value={group.format} />
+                  <DetailItem icon={BookOpen} label="Encontros" value={group.schedule} />
+                </div>
+
+                <div className="space-y-3 mb-8">
+                  {group.highlights.map((highlight) => (
+                    <div key={highlight} className="flex items-center gap-3 text-[#6c7f78]">
+                      <CheckCircle2 size={18} className="text-[#76A88E] shrink-0" />
+                      <span>{highlight}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5 border-t border-[#e5ece7] pt-6">
+                  <div>
+                    <p className="text-sm text-[#7a8782]">Investimento</p>
+                    <p className="font-['Playfair_Display'] text-3xl text-[#5f746c]">{formatPrice(group.priceInCents)} mensal</p>
+                    <p className="text-sm text-[#7a8782] mt-1">ou {formatInstallmentLabel(group)} no cartão</p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => openEnrollment(group)}
+                    className="bg-[#76A88E] text-white px-7 py-4 rounded-full flex items-center justify-center gap-3 hover:scale-105 transition"
+                  >
+                    <UserPlus size={20} />
+                    Quero me inscrever
+                  </button>
+                </div>
+              </motion.article>
+            ))}
+          </div>
+        </section>
+      </main>
+
+      {selectedGroup && (
+        <div className="fixed inset-0 z-[60] bg-[#26352f]/45 backdrop-blur-sm px-4 py-6 flex items-center justify-center">
+          <motion.div
+            initial={{ opacity: 0, y: 18 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="w-full max-w-2xl max-h-[92vh] overflow-y-auto bg-white rounded-[28px] shadow-2xl p-7 md:p-9"
+          >
+            <div className="flex items-start justify-between gap-5 mb-7">
+              <div>
+                <p className="text-sm font-semibold text-[#76A88E] mb-2">Inscrição</p>
+                <h3 className="font-['Playfair_Display'] text-3xl text-[#5f746c]">{selectedGroup.title}</h3>
+              </div>
+
+              <button
+                type="button"
+                onClick={closeEnrollment}
+                className="rounded-full bg-[#edf5ef] px-4 py-2 text-[#5f746c] hover:bg-[#dfece4] transition"
+              >
+                Fechar
+              </button>
+            </div>
+
+            <form onSubmit={submitEnrollment} className="space-y-5">
+              <FormField label="Nome completo" name="name" value={formData.name} onChange={updateFormData} required />
+              <FormField label="E-mail" name="email" type="email" value={formData.email} onChange={updateFormData} required />
+              <FormField label="WhatsApp" name="phone" value={formData.phone} onChange={updateFormData} required />
+              <SelectField
+                label="Perfil"
+                name="participantType"
+                value={formData.participantType}
+                onChange={updateFormData}
+                required
+                options={[
+                  { value: '', label: 'Selecione uma opção' },
+                  { value: 'psychology_professional', label: 'Profissional de Psicologia' },
+                  { value: 'student', label: 'Estudante' },
+                ]}
+              />
+              <FormField
+                label="CRP ou Semestre (Em caso de estudante)"
+                name="professionalDocument"
+                value={formData.professionalDocument}
+                onChange={updateFormData}
+                placeholder="Ex.: CRP 11/00000 ou 7º semestre"
+                disabled={!formData.participantType}
+                required
+              />
+              <SelectField
+                label="Forma de pagamento"
+                name="paymentMethod"
+                value={formData.paymentMethod}
+                onChange={updateFormData}
+                required
+                options={[
+                  { value: '', label: 'Selecione uma opção' },
+                  {
+                    value: 'card',
+                    label: `Cartão de débito/crédito (${formatInstallmentLabel(selectedGroup)})`,
+                  },
+                  { value: 'monthly_pix', label: `Pix mensal (${formatPrice(selectedGroup.priceInCents)})` },
+                ]}
+              />
+
+              <div className="bg-[#F8F7F4] border border-[#e5ece7] rounded-[20px] p-5">
+                <p className="text-sm text-[#7a8782] mb-1">Pagamento previsto</p>
+                <p className="font-semibold text-[#5f746c]">
+                  {formData.paymentMethod === 'monthly_pix'
+                    ? `${formatPrice(selectedGroup.priceInCents)} mensais via Pix`
+                    : `${formatPrice(getCardTotalInCents(selectedGroup))} no cartão em até ${formatInstallmentLabel(selectedGroup)}`}
+                </p>
+              </div>
+
+              {checkoutMessage && (
+                <p className="bg-[#edf5ef] text-[#5f746c] rounded-[18px] p-4 leading-7">
+                  {checkoutMessage}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={enrollmentStatus === 'saving'}
+                className="w-full bg-[#76A88E] text-white px-7 py-4 rounded-full flex items-center justify-center gap-3 hover:scale-[1.02] transition disabled:opacity-70"
+              >
+                <CreditCard size={20} />
+                {enrollmentStatus === 'saving' ? 'Registrando inscrição...' : 'Registrar inscrição'}
+              </button>
+            </form>
+          </motion.div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function MonthlyPixPaymentPage() {
+  const searchParams = new URLSearchParams(window.location.search)
+  const enrollmentId = searchParams.get('enrollment')
+  const studyGroupTitle = searchParams.get('group') || 'Grupo de estudos'
+  const amountInCents = Number(searchParams.get('amount') || 0)
+  const [copyMessage, setCopyMessage] = useState('')
+  const whatsappMessage = [
+    'Olá, Clínica EntreSer!',
+    'Realizei o pagamento mensal via Pix da minha inscrição.',
+    `Grupo: ${studyGroupTitle}`,
+    enrollmentId ? `Código da inscrição: ${enrollmentId}` : null,
+    'Segue o comprovante de pagamento.',
+  ]
+    .filter(Boolean)
+    .join('\n')
+  const whatsappUrl = `https://wa.me/${clinicWhatsappNumber}?text=${encodeURIComponent(whatsappMessage)}`
+
+  const copyPixKey = async () => {
+    await navigator.clipboard.writeText(clinicPixKey)
+    setCopyMessage('Chave Pix copiada.')
+  }
+
+  return (
+    <div className="min-h-screen bg-[#F8F7F4] text-[#4E5C57]">
+      <nav className="sticky top-0 z-50 backdrop-blur-md bg-white/75 border-b border-[#dce5dd]">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+          <a href="/" className="flex items-center gap-3">
+            <img src="/logo.jpeg" className="w-12 h-12 rounded-full object-cover" />
+            <div>
+              <h1 className="font-['Playfair_Display'] text-2xl text-[#76A88E]">EntreSer</h1>
+              <p className="text-xs tracking-[0.2em] uppercase text-[#7d8d87]">Clínica de Psicologia</p>
+            </div>
+          </a>
+
+          <a href="/grupos-de-estudos" className="hidden sm:flex items-center gap-2 text-sm font-semibold text-[#5f746c] hover:text-[#76A88E] transition">
+            <ArrowLeft size={18} />
+            Grupos de estudos
+          </a>
+        </div>
+      </nav>
+
+      <main className="px-6 py-16">
+        <motion.section
+          initial={{ opacity: 0, y: 28 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8 }}
+          className="max-w-4xl mx-auto bg-white/85 border border-white rounded-[32px] shadow-xl p-8 md:p-14 text-center"
+        >
+          <div className="mx-auto mb-8 w-20 h-20 rounded-full bg-[#edf5ef] flex items-center justify-center">
+            <CreditCard className="text-[#76A88E]" size={38} />
+          </div>
+
+          <span className="bg-[#EED9C8] text-[#6f7f79] px-4 py-2 rounded-full text-sm inline-block mb-6">
+            Pagamento via Pix mensal
+          </span>
+
+          <h2 className="font-['Playfair_Display'] text-5xl lg:text-6xl leading-tight text-[#5f746c] mb-5">
+            Finalize sua inscrição
+          </h2>
+
+          <p className="text-lg leading-8 text-[#73827c] max-w-2xl mx-auto mb-8">
+            Faça o pagamento mensal via Pix usando o QR Code abaixo. Depois, envie o comprovante para nosso WhatsApp para confirmarmos sua inscrição.
+          </p>
+
+          <div className="bg-[#F8F7F4] border border-[#e5ece7] rounded-[20px] p-5 mb-8 text-left">
+            <p className="text-sm text-[#7a8782] mb-1">Grupo</p>
+            <p className="font-semibold text-[#5f746c]">{studyGroupTitle}</p>
+            {amountInCents > 0 && (
+              <>
+                <p className="text-sm text-[#7a8782] mt-4 mb-1">Valor mensal</p>
+                <p className="font-semibold text-[#5f746c]">{formatPrice(amountInCents)}</p>
+              </>
+            )}
+            {enrollmentId && (
+              <>
+                <p className="text-sm text-[#7a8782] mt-4 mb-1">Código da inscrição</p>
+                <p className="font-semibold text-[#5f746c] break-all">{enrollmentId}</p>
+              </>
+            )}
+          </div>
+
+          <div className="mx-auto mb-6 max-w-xs rounded-[24px] border border-[#e5ece7] bg-white p-5 shadow-sm">
+            <img src="/qrcode-pix.png" alt="QR Code Pix da Clínica EntreSer" className="w-full" />
+          </div>
+
+          <div className="bg-[#edf5ef] text-[#5f746c] rounded-[20px] p-5 mb-6">
+            <p className="text-sm mb-2">Chave Pix</p>
+            <div className="flex items-center justify-center gap-2">
+              <p className="font-semibold break-all">{clinicPixKey}</p>
+              <button
+                type="button"
+                onClick={copyPixKey}
+                aria-label="Copiar chave Pix"
+                className="rounded-full p-2 text-[#76A88E] hover:bg-white/80 transition"
+              >
+                <Copy size={17} />
+              </button>
+            </div>
+          </div>
+
+          <p className="text-[#73827c] leading-7 mb-8">
+            Quando o pagamento for aprovado, envie o comprovante de pagamento para nosso WhatsApp.
+          </p>
+
+          <div className="flex flex-col sm:flex-row justify-center gap-4">
+            <button
+              type="button"
+              onClick={copyPixKey}
+              className="bg-[#edf5ef] text-[#5f746c] px-7 py-4 rounded-full flex items-center justify-center gap-3 hover:bg-[#dfece4] transition"
+            >
+              <Copy size={20} />
+              Copiar Pix
+            </button>
+
+            <a
+              href={whatsappUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="bg-[#76A88E] text-white px-7 py-4 rounded-full flex items-center justify-center gap-3 hover:scale-105 transition"
+            >
+              <Send size={20} />
+              Enviar comprovante
+            </a>
+          </div>
+
+          {copyMessage && <p className="mt-5 text-sm text-[#76A88E]">{copyMessage}</p>}
+        </motion.section>
+      </main>
+    </div>
+  )
+}
+
+function EnrollmentConfirmationPage() {
+  const searchParams = new URLSearchParams(window.location.search)
+  const enrollmentId = searchParams.get('enrollment') || searchParams.get('external_reference')
+  const paymentId = searchParams.get('payment_id') || searchParams.get('collection_id')
+  const checkoutUrl = searchParams.get('checkout')
+  const [isCheckingPayment, setIsCheckingPayment] = useState(false)
+  const [paymentConfirmation, setPaymentConfirmation] = useState({
+    status: paymentId ? 'checking' : 'idle',
+    message: paymentId ? 'Confirmando pagamento...' : 'Aguardando confirmação do pagamento.',
+  })
+  const whatsappMessage = [
+    'Olá, Clínica EntreSer!',
+    'Realizei o pagamento da minha inscrição em um grupo de estudos pelo site.',
+    enrollmentId ? `Código da inscrição: ${enrollmentId}` : null,
+    'Segue minha confirmação.',
+  ]
+    .filter(Boolean)
+    .join('\n')
+  const whatsappUrl = `https://wa.me/${clinicWhatsappNumber}?text=${encodeURIComponent(whatsappMessage)}`
+  const isPaymentApproved = paymentConfirmation.status === 'approved'
+
+  useEffect(() => {
+    if (!enrollmentId || !paymentId) return
+
+    async function confirmPayment() {
+      try {
+        const response = await fetch('/.netlify/functions/confirm-study-group-payment', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ enrollmentId, paymentId }),
+        })
+        const payload = await response.json().catch(() => ({}))
+
+        if (!response.ok) {
+          throw new Error(payload.error || 'Não foi possível confirmar o pagamento.')
+        }
+
+        setPaymentConfirmation({
+          status: payload.paymentStatus,
+          message:
+            payload.paymentStatus === 'approved'
+              ? 'Pagamento aprovado e inscrição atualizada no sistema.'
+              : `Pagamento registrado com status: ${payload.paymentStatus}.`,
+        })
+      } catch (error) {
+        setPaymentConfirmation({
+          status: 'error',
+          message: error.message || 'Não foi possível confirmar o pagamento automaticamente.',
+        })
+      }
+    }
+
+    confirmPayment()
+  }, [enrollmentId, paymentId])
+
+  useEffect(() => {
+    if (!enrollmentId || paymentId) return
+
+    let attempts = 0
+    let timeoutId
+
+    async function checkEnrollmentStatus() {
+      try {
+        attempts += 1
+        const payload = await syncPaymentByEnrollment(enrollmentId)
+
+        setPaymentConfirmation({
+          status: payload.paymentStatus,
+          message:
+            payload.paymentStatus === 'approved'
+              ? 'Pagamento aprovado e inscrição confirmada no sistema.'
+              : 'Ainda estamos aguardando a confirmação do pagamento. Se você pagou por Pix, isso pode levar alguns instantes.',
+        })
+
+        if (payload.paymentStatus !== 'approved' && attempts < 30) {
+          timeoutId = window.setTimeout(checkEnrollmentStatus, 10000)
+        }
+      } catch (error) {
+        setPaymentConfirmation({
+          status: 'error',
+          message: error.message || 'Não foi possível consultar o pagamento automaticamente.',
+        })
+      }
+    }
+
+    checkEnrollmentStatus()
+
+    return () => window.clearTimeout(timeoutId)
+  }, [enrollmentId, paymentId])
+
+  const verifyPaymentNow = async () => {
+    if (!enrollmentId) return
+
+    setIsCheckingPayment(true)
+
+    try {
+      const payload = await syncPaymentByEnrollment(enrollmentId)
+
+      setPaymentConfirmation({
+        status: payload.paymentStatus,
+        message:
+          payload.paymentStatus === 'approved'
+            ? 'Pagamento aprovado e inscrição confirmada no sistema. O e-mail de confirmação foi processado.'
+            : 'Pagamento ainda não aprovado. Se você pagou por Pix, aguarde alguns instantes e verifique novamente.',
+      })
+    } catch (error) {
+      setPaymentConfirmation({
+        status: 'error',
+        message: error.message || 'Não foi possível verificar o pagamento agora.',
+      })
+    } finally {
+      setIsCheckingPayment(false)
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-[#F8F7F4] text-[#4E5C57]">
+      <nav className="sticky top-0 z-50 backdrop-blur-md bg-white/75 border-b border-[#dce5dd]">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+          <a href="/" className="flex items-center gap-3">
+            <img src="/logo.jpeg" className="w-12 h-12 rounded-full object-cover" />
+            <div>
+              <h1 className="font-['Playfair_Display'] text-2xl text-[#76A88E]">EntreSer</h1>
+              <p className="text-xs tracking-[0.2em] uppercase text-[#7d8d87]">Clínica de Psicologia</p>
+            </div>
+          </a>
+
+          <a href="/grupos-de-estudos" className="hidden sm:flex items-center gap-2 text-sm font-semibold text-[#5f746c] hover:text-[#76A88E] transition">
+            <ArrowLeft size={18} />
+            Grupos de estudos
+          </a>
+        </div>
+      </nav>
+
+      <main className="px-6 py-16">
+        <motion.section
+          initial={{ opacity: 0, y: 28 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.8 }}
+          className="max-w-4xl mx-auto bg-white/85 border border-white rounded-[32px] shadow-xl p-8 md:p-14 text-center"
+        >
+          <div className="mx-auto mb-8 w-20 h-20 rounded-full bg-[#edf5ef] flex items-center justify-center">
+            <CheckCircle2 className="text-[#76A88E]" size={42} />
+          </div>
+
+          <span className="bg-[#EED9C8] text-[#6f7f79] px-4 py-2 rounded-full text-sm inline-block mb-6">
+            Inscrição recebida
+          </span>
+
+          <h2 className="font-['Playfair_Display'] text-5xl lg:text-6xl leading-tight text-[#5f746c] mb-6">
+            Parabéns pela sua inscrição!
+          </h2>
+
+          <p className="text-lg leading-8 text-[#73827c] max-w-2xl mx-auto mb-8">
+            Quando o pagamento for aprovado, a equipe da EntreSer será avisada automaticamente por e-mail.
+          </p>
+
+          {enrollmentId && (
+            <div className="bg-[#F8F7F4] border border-[#e5ece7] rounded-[20px] p-5 mb-8 text-left">
+              <p className="text-sm text-[#7a8782] mb-1">Código da inscrição</p>
+              <p className="font-semibold text-[#5f746c] break-all">{enrollmentId}</p>
+            </div>
+          )}
+
+          {paymentConfirmation.message && (
+            <div className="bg-[#edf5ef] text-[#5f746c] rounded-[20px] p-5 mb-8 leading-7">
+              {paymentConfirmation.message}
+            </div>
+          )}
+
+          <div className="flex flex-col sm:flex-row justify-center gap-4">
+            {checkoutUrl && (
+              <a
+                href={checkoutUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="bg-[#76A88E] text-white px-7 py-4 rounded-full flex items-center justify-center gap-3 hover:scale-105 transition"
+              >
+                <CreditCard size={20} />
+                Abrir pagamento
+              </a>
+            )}
+
+            <button
+              type="button"
+              onClick={verifyPaymentNow}
+              disabled={isCheckingPayment}
+              className="bg-[#edf5ef] text-[#5f746c] px-7 py-4 rounded-full flex items-center justify-center gap-3 hover:bg-[#dfece4] transition disabled:opacity-70"
+            >
+              <RefreshCw size={20} />
+              {isCheckingPayment ? 'Verificando...' : 'Verificar pagamento'}
+            </button>
+
+            <a
+              href={whatsappUrl}
+              target="_blank"
+              rel="noreferrer"
+              aria-disabled={!isPaymentApproved}
+              onClick={(event) => {
+                if (!isPaymentApproved) {
+                  event.preventDefault()
+                }
+              }}
+              className={`px-7 py-4 rounded-full flex items-center justify-center gap-3 transition ${
+                isPaymentApproved
+                  ? 'bg-[#76A88E] text-white hover:scale-105'
+                  : 'bg-[#edf5ef] text-[#8a9a94] cursor-not-allowed opacity-70'
+              }`}
+            >
+              <Send size={20} />
+              {isPaymentApproved ? 'Enviar confirmação' : 'Aguardando aprovação'}
+            </a>
+          </div>
+        </motion.section>
+      </main>
+    </div>
+  )
+}
+
+async function syncPaymentByEnrollment(enrollmentId) {
+  const response = await fetch('/.netlify/functions/sync-study-group-payment-by-enrollment', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ enrollmentId }),
+  })
+  const payload = await response.json().catch(() => ({}))
+
+  if (!response.ok) {
+    throw new Error(payload.error || 'Não foi possível consultar o pagamento.')
+  }
+
+  return payload
+}
+
+function DetailItem({ icon: Icon, label, value }) {
+  return (
+    <div className="bg-[#F8F7F4] border border-[#e5ece7] rounded-[18px] p-4">
+      <div className="flex items-center gap-2 text-[#76A88E] mb-2">
+        <Icon size={17} />
+        <span className="text-sm font-semibold">{label}</span>
+      </div>
+      <p className="text-[#5f746c] leading-6">{value}</p>
+    </div>
+  )
+}
+
+function FormField({ label, name, type = 'text', value, onChange, placeholder, required, disabled }) {
+  return (
+    <label className="block">
+      <span className="block text-sm font-semibold text-[#5f746c] mb-2">{label}</span>
+      <input
+        name={name}
+        type={type}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        required={required}
+        disabled={disabled}
+        className="w-full rounded-[18px] border border-[#dce5dd] bg-white px-4 py-3 text-[#4E5C57] outline-none focus:border-[#76A88E] focus:ring-4 focus:ring-[#76A88E]/15 transition disabled:bg-[#f1f4f2] disabled:text-[#9aa8a2]"
+      />
+    </label>
+  )
+}
+
+function SelectField({ label, name, value, onChange, options, required }) {
+  return (
+    <label className="block">
+      <span className="block text-sm font-semibold text-[#5f746c] mb-2">{label}</span>
+      <select
+        name={name}
+        value={value}
+        onChange={onChange}
+        required={required}
+        className="w-full rounded-[18px] border border-[#dce5dd] bg-white px-4 py-3 text-[#4E5C57] outline-none focus:border-[#76A88E] focus:ring-4 focus:ring-[#76A88E]/15 transition"
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
   )
 }

@@ -1,0 +1,145 @@
+create extension if not exists "pgcrypto";
+
+create table if not exists public.study_groups (
+  id text primary key,
+  title text not null,
+  subtitle text not null,
+  status text not null default 'active',
+  audience text,
+  format text,
+  schedule text,
+  starts_at date,
+  duration text,
+  seats_available integer not null default 0,
+  price_in_cents integer not null,
+  installment_count integer not null default 1,
+  facilitator text,
+  banner_image text,
+  banner_position text,
+  contact_whatsapp text,
+  highlights text[] not null default '{}',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create table if not exists public.study_group_enrollments (
+  id uuid primary key default gen_random_uuid(),
+  study_group_id text not null references public.study_groups(id),
+  participant_name text not null,
+  participant_email text not null,
+  participant_phone text not null,
+  professional_profile text not null,
+  amount_in_cents integer not null,
+  payment_status text not null default 'pending',
+  mercado_pago_preference_id text,
+  mercado_pago_payment_id text,
+  checkout_url text,
+  payment_details jsonb,
+  notification_sent_at timestamptz,
+  notification_error text,
+  paid_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+alter table public.study_groups
+add column if not exists banner_image text,
+add column if not exists banner_position text,
+add column if not exists contact_whatsapp text,
+add column if not exists installment_count integer not null default 1;
+
+alter table public.study_group_enrollments
+add column if not exists notification_sent_at timestamptz,
+add column if not exists notification_error text;
+
+alter table public.study_groups enable row level security;
+alter table public.study_group_enrollments enable row level security;
+
+drop policy if exists "Active study groups are public" on public.study_groups;
+create policy "Active study groups are public"
+  on public.study_groups
+  for select
+  using (status = 'active');
+
+insert into public.study_groups (
+  id,
+  title,
+  subtitle,
+  status,
+  audience,
+  format,
+  schedule,
+  starts_at,
+  duration,
+  seats_available,
+  price_in_cents,
+  installment_count,
+  facilitator,
+  banner_image,
+  banner_position,
+  contact_whatsapp,
+  highlights
+) values
+  (
+    'self-da-situacao-gestalt-2026',
+    'Self da Situação',
+    'A teoria do self na abordagem gestáltica, com eixo temático no corpo em Gestalt-terapia.',
+    'active',
+    'Estudantes e profissionais interessados na abordagem gestáltica.',
+    'Online pela plataforma Zoom',
+    'Mensal, aos sábados',
+    '2026-08-15',
+    '5 meses',
+    20,
+    13000,
+    5,
+    'Lastênia Soares de Lima',
+    '/grupo-self-situacao.jpeg',
+    'center center',
+    '5585996189558',
+    array['Eixo temático: o corpo em Gestalt-terapia', 'Datas: 15/08, 12/09, 17/10, 14/11 e 12/12', 'Com ebooks dos encontros']
+  ),
+  (
+    'psicopatologia-critica-gestalt-fenomenologia-2026',
+    'Psicopatologia Crítica',
+    'Grupo de estudo em psicopatologia crítica na abordagem gestáltica e fenomenologia.',
+    'active',
+    'Estudantes e profissionais interessados em Gestalt-terapia, fenomenologia e psicopatologia crítica.',
+    'Online pela plataforma Meet',
+    'Encontros mensais aos sábados',
+    '2026-08-08',
+    '4 meses',
+    20,
+    12000,
+    4,
+    'Silvia Barbosa Correia e Antônio Joelmir Portela da Silva',
+    '/grupo-psicopatologia-critica.jpeg',
+    'center center',
+    '5585981417741',
+    array['Abordagem gestáltica e fenomenologia', 'Início em 08/08', 'Mensal, aos sábados']
+  )
+on conflict (id) do update set
+  title = excluded.title,
+  subtitle = excluded.subtitle,
+  status = excluded.status,
+  audience = excluded.audience,
+  format = excluded.format,
+  schedule = excluded.schedule,
+  starts_at = excluded.starts_at,
+  duration = excluded.duration,
+  seats_available = excluded.seats_available,
+  price_in_cents = excluded.price_in_cents,
+  installment_count = excluded.installment_count,
+  facilitator = excluded.facilitator,
+  banner_image = excluded.banner_image,
+  banner_position = excluded.banner_position,
+  contact_whatsapp = excluded.contact_whatsapp,
+  highlights = excluded.highlights,
+  updated_at = now();
+
+update public.study_groups
+set status = 'closed', updated_at = now()
+where id in (
+  'gestalt-terapia-clinica-2026',
+  'infancia-adolescencia-gestalt-2026'
+);
