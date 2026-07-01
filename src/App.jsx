@@ -94,7 +94,7 @@ function formatDate(date) {
 function getInstallmentCount(group) {
   if (group?.installmentCount) return group.installmentCount
   if (group?.id === 'self-da-situacao-gestalt-2026') return 5
-  if (group?.id === 'psicopatologia-critica-gestalt-fenomenologia-2026') return 4
+  if (group?.id === 'psicopatologia-critica-gestalt-fenomenologia-2026') return 5
   return 1
 }
 
@@ -105,7 +105,7 @@ function getCardTotalInCents(group) {
 function formatInstallmentLabel(group) {
   const installments = getInstallmentCount(group)
 
-  return `${installments}x de ${formatPrice(group.priceInCents)} sem juros`
+  return `até ${installments}x`
 }
 
 export default function App() {
@@ -638,7 +638,7 @@ function StudyGroupsPage() {
                   <div>
                     <p className="text-sm text-[#7a8782]">Investimento</p>
                     <p className="font-['Playfair_Display'] text-3xl text-[#5f746c]">{formatPrice(group.priceInCents)} mensal</p>
-                    <p className="text-sm text-[#7a8782] mt-1">ou {formatInstallmentLabel(group)} no cartão</p>
+                    <p className="text-sm text-[#7a8782] mt-1">Ou em {formatInstallmentLabel(group)} no cartão</p>
                   </div>
 
                   <button
@@ -713,7 +713,7 @@ function StudyGroupsPage() {
                   { value: '', label: 'Selecione uma opção' },
                   {
                     value: 'card',
-                    label: `Cartão de débito/crédito (${formatInstallmentLabel(selectedGroup)})`,
+                    label: `Cartão de débito/crédito (em ${formatInstallmentLabel(selectedGroup)})`,
                   },
                   { value: 'monthly_pix', label: `Pix mensal (${formatPrice(selectedGroup.priceInCents)})` },
                 ]}
@@ -724,7 +724,7 @@ function StudyGroupsPage() {
                 <p className="font-semibold text-[#5f746c]">
                   {formData.paymentMethod === 'monthly_pix'
                     ? `${formatPrice(selectedGroup.priceInCents)} mensais via Pix`
-                    : `${formatPrice(getCardTotalInCents(selectedGroup))} no cartão em até ${formatInstallmentLabel(selectedGroup)}`}
+                    : `${formatPrice(getCardTotalInCents(selectedGroup))} no cartão em ${formatInstallmentLabel(selectedGroup)}`}
                 </p>
               </div>
 

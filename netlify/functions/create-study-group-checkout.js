@@ -150,7 +150,7 @@ async function createMercadoPagoPreference(studyGroup, participant, enrollmentId
 function getCardPaymentPlan(studyGroup) {
   const installmentMap = {
     'self-da-situacao-gestalt-2026': 5,
-    'psicopatologia-critica-gestalt-fenomenologia-2026': 4,
+    'psicopatologia-critica-gestalt-fenomenologia-2026': 5,
   }
   const installments = installmentMap[studyGroup.id] || 1
 

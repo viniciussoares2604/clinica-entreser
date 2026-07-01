@@ -87,7 +87,7 @@ insert into public.study_groups (
     'active',
     'Estudantes e profissionais interessados na abordagem gestáltica.',
     'Online pela plataforma Zoom',
-    'Mensal, aos sábados',
+    'Mensal',
     '2026-08-15',
     '5 meses',
     20,
@@ -106,17 +106,17 @@ insert into public.study_groups (
     'active',
     'Estudantes e profissionais interessados em Gestalt-terapia, fenomenologia e psicopatologia crítica.',
     'Online pela plataforma Meet',
-    'Encontros mensais aos sábados',
+    'Encontros mensais',
     '2026-08-08',
-    '4 meses',
+    '5 meses',
     20,
     12000,
-    4,
+    5,
     'Silvia Barbosa Correia e Antônio Joelmir Portela da Silva',
     '/grupo-psicopatologia-critica.jpeg',
     'center center',
     '5585981417741',
-    array['Abordagem gestáltica e fenomenologia', 'Início em 08/08', 'Mensal, aos sábados']
+    array['Abordagem gestáltica e fenomenologia', 'Datas: 08/08, 19/09, 17/10, 21/11 e 12/12', 'Mensal']
   )
 on conflict (id) do update set
   title = excluded.title,

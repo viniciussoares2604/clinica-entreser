@@ -12,7 +12,7 @@ const studyGroupMedia = {
     bannerImage: '/grupo-psicopatologia-critica.jpeg',
     bannerPosition: 'center center',
     contactWhatsapp: '5585981417741',
-    installmentCount: 4,
+    installmentCount: 5,
   },
 }
 
