@@ -13,6 +13,7 @@ import {
   CreditCard,
   HeartHandshake,
   Instagram,
+  LogIn,
   MapPin,
   MessageCircle,
   RefreshCw,
@@ -23,8 +24,13 @@ import {
 import {
   createMonthlyPixEnrollment,
   createStudyGroupEnrollment,
+  createStudyGroup,
+  deleteStudyGroup,
   listActiveStudyGroups,
+  updateStudyGroup,
+  uploadStudyGroupImage,
 } from './services/studyGroupsService'
+import { login } from './services/authService'
 
 const clinicImages = [
   '/principal.jpg',
@@ -108,10 +114,37 @@ function formatInstallmentLabel(group) {
   return `até ${installments}x`
 }
 
+function slugify(text) {
+  return text
+    .toString()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim()
+    .replace(/\s+/g, '-')
+    .replace(/[^a-z0-9-]/g, '')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '')
+}
+
+function buildStudyGroupId(title, startsAt) {
+  const baseSlug = slugify(title) || 'curso'
+  const dateSlug = startsAt ? startsAt.replace(/-/g, '') : Date.now()
+
+  return `${baseSlug}-${dateSlug}`
+}
+
 export default function App() {
   const [currentClinicImage, setCurrentClinicImage] = useState(0)
   const [expandedTherapists, setExpandedTherapists] = useState({})
   const [currentPath, setCurrentPath] = useState(window.location.pathname)
+  const [authenticated, setAuthenticated] = useState(() => {
+    try {
+      return Boolean(window.localStorage.getItem('entreser-admin-token'))
+    } catch {
+      return false
+    }
+  })
 
   useEffect(() => {
     const interval = window.setInterval(() => {
@@ -128,8 +161,50 @@ export default function App() {
     return () => window.removeEventListener('popstate', handleNavigation)
   }, [])
 
+  useEffect(() => {
+    if (currentPath.startsWith('/admin-grupos') && !authenticated) {
+      window.history.replaceState({}, '', '/login')
+      setCurrentPath('/login')
+      return
+    }
+
+    if (currentPath === '/login' && authenticated) {
+      window.history.replaceState({}, '', '/admin-grupos')
+      setCurrentPath('/admin-grupos')
+    }
+  }, [currentPath, authenticated])
+
+  const navigateTo = (path) => {
+    window.history.pushState({}, '', path)
+    setCurrentPath(path)
+  }
+
   if (currentPath === '/grupos-de-estudos') {
     return <StudyGroupsPage />
+  }
+
+  if (currentPath === '/login') {
+    return (
+      <LoginPage
+        onSuccess={() => {
+          setAuthenticated(true)
+          navigateTo('/admin-grupos')
+        }}
+      />
+    )
+  }
+
+  if (currentPath === '/admin-grupos') {
+    if (!authenticated) {
+      return null
+    }
+
+    return <StudyGroupsAdminPage onLogout={() => {
+      window.localStorage.removeItem('entreser-admin-token')
+      window.localStorage.removeItem('entreser-admin-auth')
+      setAuthenticated(false)
+      navigateTo('/login')
+    }} />
   }
 
   if (currentPath === '/inscricao-confirmada') {
@@ -172,6 +247,15 @@ export default function App() {
             <a href="#terapeutas" className="hover:text-[#76A88E] transition">PSICOTERAPEUTAS</a>
             <a href="#formacao" className="hover:text-[#76A88E] transition">FORMAÇÃO</a> 
             <a href="#faca-parte" className="hover:text-[#76A88E] transition">FAÇA PARTE</a>
+            <button
+              type="button"
+              onClick={() => navigateTo('/login')}
+              aria-label="Acessar área administrativa"
+              title="Acessar área administrativa"
+              className="w-10 h-10 rounded-full border border-[#dce5dd] bg-white/70 text-[#5f746c] flex items-center justify-center hover:border-[#76A88E] hover:text-[#76A88E] transition"
+            >
+              <LogIn size={18} />
+            </button>
           </div>
         </div>
       </nav>
@@ -468,6 +552,63 @@ profissionais de Psicologia
   )
 }
 
+function LoginPage({ onSuccess }) {
+  const [formData, setFormData] = useState({ username: '', password: '' })
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const handleChange = (event) => {
+    const { name, value } = event.target
+    setFormData((current) => ({ ...current, [name]: value }))
+  }
+
+  const handleSubmit = async (event) => {
+    event.preventDefault()
+    setLoading(true)
+    setError('')
+
+    try {
+      const payload = await login(formData)
+      window.localStorage.setItem('entreser-admin-token', payload.token)
+      onSuccess()
+    } catch (loginError) {
+      setError(loginError.message || 'Usuário ou senha inválidos.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-[#F8F7F4] text-[#4E5C57] flex items-center justify-center px-6 py-16">
+      <div className="w-full max-w-xl bg-white rounded-[28px] border border-[#dce5dd] shadow-xl p-10">
+        <div className="mb-8 text-center">
+          <h1 className="font-['Playfair_Display'] text-4xl text-[#5f746c] mb-3">Acesso administrativo</h1>
+          <p className="text-[#7a8782]">Faça login para acessar a área de cadastro de cursos e grupos.</p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <FormField label="Usuário" name="username" value={formData.username} onChange={handleChange} required />
+          <FormField label="Senha" name="password" type="password" value={formData.password} onChange={handleChange} required />
+
+          {error && (
+            <div className="rounded-[20px] bg-[#FBE8E8] border border-[#F2C2C2] p-4 text-[#8a3d3d]">
+              {error}
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-[#76A88E] text-white px-7 py-4 rounded-full text-base font-semibold hover:scale-[1.02] transition disabled:opacity-70"
+          >
+            {loading ? 'Entrando...' : 'Entrar'}
+          </button>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 function StudyGroupsPage() {
   const [studyGroups, setStudyGroups] = useState([])
   const [selectedGroup, setSelectedGroup] = useState(null)
@@ -637,7 +778,9 @@ function StudyGroupsPage() {
                 <div className="mt-auto flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5 border-t border-[#e5ece7] pt-6">
                   <div>
                     <p className="text-sm text-[#7a8782]">Investimento</p>
-                    <p className="font-['Playfair_Display'] text-3xl text-[#5f746c]">{formatPrice(group.priceInCents)} mensal</p>
+                    <p className="font-['Playfair_Display'] text-3xl text-[#5f746c]">
+                      {formatPrice(group.priceInCents)} {group.pixPaymentType === 'total' ? 'total' : 'mensal'}
+                    </p>
                     <p className="text-sm text-[#7a8782] mt-1">Ou em {formatInstallmentLabel(group)} no cartão</p>
                   </div>
 
@@ -715,7 +858,13 @@ function StudyGroupsPage() {
                     value: 'card',
                     label: `Cartão de débito/crédito (em ${formatInstallmentLabel(selectedGroup)})`,
                   },
-                  { value: 'monthly_pix', label: `Pix mensal (${formatPrice(selectedGroup.priceInCents)})` },
+                  {
+                    value: 'monthly_pix',
+                    label:
+                      selectedGroup.pixPaymentType === 'total'
+                        ? `Pix total (${formatPrice(selectedGroup.priceInCents)})`
+                        : `Pix mensal (${formatPrice(selectedGroup.priceInCents)})`,
+                  },
                 ]}
               />
 
@@ -723,7 +872,9 @@ function StudyGroupsPage() {
                 <p className="text-sm text-[#7a8782] mb-1">Pagamento previsto</p>
                 <p className="font-semibold text-[#5f746c]">
                   {formData.paymentMethod === 'monthly_pix'
-                    ? `${formatPrice(selectedGroup.priceInCents)} mensais via Pix`
+                    ? selectedGroup.pixPaymentType === 'total'
+                      ? `${formatPrice(selectedGroup.priceInCents)} total via Pix`
+                      : `${formatPrice(selectedGroup.priceInCents)} mensais via Pix`
                     : `${formatPrice(getCardTotalInCents(selectedGroup))} no cartão em ${formatInstallmentLabel(selectedGroup)}`}
                 </p>
               </div>
@@ -746,6 +897,375 @@ function StudyGroupsPage() {
           </motion.div>
         </div>
       )}
+    </div>
+  )
+}
+
+function StudyGroupsAdminPage({ onLogout }) {
+  const [studyGroups, setStudyGroups] = useState([])
+  const [selectedGroup, setSelectedGroup] = useState(null)
+  const [formData, setFormData] = useState({
+    title: '',
+    subtitle: '',
+    startsAt: '',
+    duration: '',
+    format: '',
+    schedule: '',
+    highlights: '',
+    price: '',
+    pixPaymentType: 'monthly',
+    installmentCount: 1,
+    bannerImage: '',
+    audience: '',
+    facilitator: '',
+    seatsAvailable: 20,
+    contactWhatsapp: '',
+  })
+  const [message, setMessage] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [uploadingImage, setUploadingImage] = useState(false)
+
+  useEffect(() => {
+    listActiveStudyGroups().then(setStudyGroups)
+  }, [])
+
+  const refreshGroups = async () => {
+    const groups = await listActiveStudyGroups()
+    setStudyGroups(groups)
+  }
+
+  const resetForm = () => {
+    setSelectedGroup(null)
+    setFormData({
+      title: '',
+      subtitle: '',
+      startsAt: '',
+      duration: '',
+      format: '',
+      schedule: '',
+      highlights: '',
+      price: '',
+      pixPaymentType: 'monthly',
+      installmentCount: 1,
+      bannerImage: '',
+      audience: '',
+      facilitator: '',
+      seatsAvailable: 20,
+      contactWhatsapp: '',
+    })
+    setMessage('')
+  }
+
+  const openCreateForm = () => {
+    resetForm()
+  }
+
+  const openEditForm = (group) => {
+    setSelectedGroup(group)
+    setFormData({
+      title: group.title,
+      subtitle: group.subtitle,
+      startsAt: group.startsAt,
+      duration: group.duration,
+      format: group.format,
+      schedule: group.schedule,
+      highlights: group.highlights.join('\n'),
+      price: (group.priceInCents / 100).toFixed(2),
+      pixPaymentType: group.pixPaymentType || 'monthly',
+      installmentCount: group.installmentCount || 1,
+      bannerImage: group.bannerImage || '',
+      audience: group.audience || '',
+      facilitator: group.facilitator || '',
+      seatsAvailable: group.seatsAvailable || 20,
+      contactWhatsapp: group.contactWhatsapp || '',
+    })
+    setMessage('')
+  }
+
+  const handleChange = (event) => {
+    const { name, value } = event.target
+    setFormData((current) => ({ ...current, [name]: value }))
+  }
+
+  const handleImageChange = async (event) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+
+    setUploadingImage(true)
+    setMessage('')
+
+    try {
+      const url = await uploadStudyGroupImage(file)
+      setFormData((current) => ({ ...current, bannerImage: url }))
+      setMessage('Imagem enviada com sucesso.')
+    } catch (error) {
+      setMessage(error.message || 'Não foi possível enviar a imagem.')
+    } finally {
+      setUploadingImage(false)
+    }
+  }
+
+  const saveGroup = async (event) => {
+    event.preventDefault()
+    setSaving(true)
+    setMessage('')
+
+    try {
+      const priceInCents = Math.round(Number(formData.price.replace(/,/g, '.')) * 100)
+      const installmentCount = Number(formData.installmentCount) || 1
+
+      if (!Number.isFinite(priceInCents) || priceInCents <= 0) {
+        throw new Error('Informe um valor válido para o curso.')
+      }
+
+      if (installmentCount < 1 || installmentCount > 12) {
+        throw new Error('Informe uma quantidade de parcelas entre 1 e 12.')
+      }
+
+      const payload = {
+        id: selectedGroup?.id || buildStudyGroupId(formData.title, formData.startsAt),
+        title: formData.title,
+        subtitle: formData.subtitle,
+        status: 'active',
+        audience: formData.audience,
+        format: formData.format,
+        schedule: formData.schedule,
+        starts_at: formData.startsAt,
+        duration: formData.duration,
+        seats_available: Number(formData.seatsAvailable) || 20,
+        price_in_cents: priceInCents,
+        installment_count: installmentCount,
+        pix_payment_type: formData.pixPaymentType || 'monthly',
+        facilitator: formData.facilitator,
+        banner_image: formData.bannerImage,
+        banner_position: 'center center',
+        contact_whatsapp: formData.contactWhatsapp,
+        highlights: formData.highlights
+          .split('\n')
+          .map((item) => item.trim())
+          .filter(Boolean),
+      }
+
+      if (selectedGroup) {
+        await updateStudyGroup(payload)
+        setMessage('Curso atualizado com sucesso.')
+      } else {
+        await createStudyGroup(payload)
+        setMessage('Curso criado com sucesso.')
+      }
+
+      resetForm()
+      await refreshGroups()
+    } catch (error) {
+      setMessage(error.message || 'Não foi possível salvar o curso.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const removeGroup = async (groupId) => {
+    const confirmed = window.confirm('Deseja realmente remover este curso/grupo?')
+    if (!confirmed) return
+
+    try {
+      await deleteStudyGroup(groupId)
+      setMessage('Curso removido com sucesso.')
+      if (selectedGroup?.id === groupId) {
+        resetForm()
+      }
+      await refreshGroups()
+    } catch (error) {
+      setMessage(error.message || 'Não foi possível remover o curso.')
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-[#F8F7F4] text-[#4E5C57]">
+      <nav className="sticky top-0 z-50 backdrop-blur-md bg-white/75 border-b border-[#dce5dd]">
+        <div className="max-w-7xl mx-auto px-6 py-4 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <a href="/" className="flex items-center gap-3">
+            <img src="/logo.jpeg" className="w-12 h-12 rounded-full object-cover" />
+            <div>
+              <h1 className="font-['Playfair_Display'] text-2xl text-[#76A88E]">EntreSer</h1>
+              <p className="text-xs tracking-[0.2em] uppercase text-[#7d8d87]">Administração de grupos</p>
+            </div>
+          </a>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <a href="/grupos-de-estudos" className="hidden sm:flex items-center gap-2 text-sm font-semibold text-[#5f746c] hover:text-[#76A88E] transition">
+              <ArrowLeft size={18} />
+              Voltar para inscrições
+            </a>
+            <button
+              type="button"
+              onClick={onLogout}
+              className="bg-[#F6D1D1] text-[#914141] px-5 py-3 rounded-full text-sm font-semibold hover:bg-[#edc8c8] transition"
+            >
+              Sair
+            </button>
+          </div>
+        </div>
+      </nav>
+
+      <main className="px-6 py-16">
+        <div className="max-w-7xl mx-auto">
+          <header className="mb-10 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div>
+              <span className="bg-[#EED9C8] text-[#6f7f79] px-4 py-2 rounded-full text-sm inline-block mb-4">
+                Administração de grupos ativos
+              </span>
+              <h2 className="font-['Playfair_Display'] text-5xl text-[#5f746c]">Gerenciar cursos e grupos de estudo</h2>
+              <p className="text-lg leading-8 text-[#73827c] max-w-2xl mt-4">
+                Crie, edite ou remova cursos ativos. Os grupos serão publicados imediatamente e poderão ser inscritos pelo site.
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={openCreateForm}
+              className="w-fit bg-[#76A88E] text-white px-7 py-4 rounded-full flex items-center justify-center gap-3 hover:scale-105 transition"
+            >
+              <BookOpen size={20} />
+              Novo curso/grupo
+            </button>
+          </header>
+
+          <section className="grid gap-8 lg:grid-cols-[1.2fr_0.8fr]">
+            <div className="space-y-6">
+              {!studyGroups.length && (
+                <div className="bg-white border border-[#e5ece7] rounded-[28px] p-6 shadow-sm text-[#7a8782]">
+                  Nenhum curso ativo encontrado.
+                </div>
+              )}
+
+              {studyGroups.map((group) => (
+                <div key={group.id} className="bg-white border border-[#e5ece7] rounded-[28px] p-6 shadow-sm">
+                  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+                    <div>
+                      {group.bannerImage && (
+                        <img
+                          src={group.bannerImage}
+                          alt=""
+                          className="mb-4 h-36 w-full rounded-[18px] border border-[#e5ece7] bg-[#F8F7F4] object-cover sm:w-56"
+                          style={{ objectPosition: group.bannerPosition || 'center center' }}
+                        />
+                      )}
+                      <h3 className="text-2xl font-semibold text-[#5f746c]">{group.title}</h3>
+                      <p className="text-[#7a8782] mt-1">{group.subtitle}</p>
+                      <p className="mt-3 text-sm font-semibold text-[#5f746c]">
+                        {formatPrice(group.priceInCents)} {group.pixPaymentType === 'total' ? 'total no Pix' : 'mensal no Pix'} · cartão em {formatInstallmentLabel(group)}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => openEditForm(group)}
+                        className="bg-[#edf5ef] text-[#5f746c] px-4 py-2 rounded-full hover:bg-[#dfece4] transition"
+                      >
+                        Editar
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeGroup(group.id)}
+                        className="bg-[#F6D1D1] text-[#914141] px-4 py-2 rounded-full hover:bg-[#edc8c8] transition"
+                      >
+                        Remover
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                    <DetailItem icon={CalendarDays} label="Início" value={formatDate(group.startsAt)} />
+                    <DetailItem icon={Clock} label="Duração" value={group.duration} />
+                    <DetailItem icon={UsersRound} label="Formato" value={group.format} />
+                    <DetailItem icon={BookOpen} label="Encontros" value={group.schedule} />
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="bg-white border border-[#e5ece7] rounded-[28px] p-8 shadow-sm">
+              <h3 className="text-3xl font-semibold text-[#5f746c] mb-6">
+                {selectedGroup ? 'Editar curso/grupo' : 'Adicionar novo curso/grupo'}
+              </h3>
+
+              <form onSubmit={saveGroup} className="space-y-5">
+                <FormField label="Título" name="title" value={formData.title} onChange={handleChange} required />
+                <TextAreaField label="Descrição" name="subtitle" value={formData.subtitle} onChange={handleChange} rows={3} required />
+                <FormField label="Data de início" name="startsAt" type="date" value={formData.startsAt} onChange={handleChange} required />
+                <FormField label="Duração" name="duration" value={formData.duration} onChange={handleChange} required />
+                <FormField label="Formato" name="format" value={formData.format} onChange={handleChange} placeholder="Online/Presencial e plataforma" required />
+                <FormField label="Encontros" name="schedule" value={formData.schedule} onChange={handleChange} placeholder="Semanal, mensal, diário, anual..." required />
+                <TextAreaField label="Informações adicionais" name="highlights" value={formData.highlights} onChange={handleChange} placeholder="Uma linha por item" rows={4} />
+                <FormField label="Facilitador" name="facilitator" value={formData.facilitator} onChange={handleChange} />
+                <FormField label="Público" name="audience" value={formData.audience} onChange={handleChange} />
+                <FormField label="Valor do curso (R$)" name="price" type="text" value={formData.price} onChange={handleChange} required />
+
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <SelectField
+                    label="Pix"
+                    name="pixPaymentType"
+                    value={formData.pixPaymentType}
+                    onChange={handleChange}
+                    options={[
+                      { value: 'monthly', label: 'Pix mensal' },
+                      { value: 'total', label: 'Pix total' },
+                    ]}
+                    required
+                  />
+                  <FormField
+                    label="Parcelas no cartão"
+                    name="installmentCount"
+                    type="number"
+                    value={formData.installmentCount}
+                    onChange={handleChange}
+                    min={1}
+                    max={12}
+                    required
+                  />
+                </div>
+
+                <FormField
+                  label="Assentos disponíveis"
+                  name="seatsAvailable"
+                  type="number"
+                  value={formData.seatsAvailable}
+                  onChange={handleChange}
+                  min={1}
+                />
+
+                <label className="block">
+                  <span className="block text-sm font-semibold text-[#5f746c] mb-2">Upload de imagem</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    className="w-full rounded-[18px] border border-[#dce5dd] bg-white px-4 py-3 text-[#4E5C57] outline-none focus:border-[#76A88E] focus:ring-4 focus:ring-[#76A88E]/15 transition"
+                  />
+                </label>
+
+                {formData.bannerImage && (
+                  <img src={formData.bannerImage} alt="Preview" className="mt-4 w-full rounded-[20px] border border-[#e5ece7] object-cover" />
+                )}
+
+                {message && (
+                  <div className="rounded-[20px] bg-[#edf5ef] border border-[#dfece4] p-4 text-[#5f746c]">
+                    {message}
+                  </div>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={saving || uploadingImage}
+                  className="w-full bg-[#76A88E] text-white px-7 py-4 rounded-full flex items-center justify-center gap-3 hover:scale-[1.02] transition disabled:opacity-70"
+                >
+                  {saving ? 'Salvando...' : selectedGroup ? 'Atualizar curso' : 'Criar curso'}
+                </button>
+              </form>
+            </div>
+          </section>
+        </div>
+      </main>
     </div>
   )
 }
@@ -1132,7 +1652,7 @@ function DetailItem({ icon: Icon, label, value }) {
   )
 }
 
-function FormField({ label, name, type = 'text', value, onChange, placeholder, required, disabled }) {
+function FormField({ label, name, type = 'text', value, onChange, placeholder, required, disabled, ...inputProps }) {
   return (
     <label className="block">
       <span className="block text-sm font-semibold text-[#5f746c] mb-2">{label}</span>
@@ -1144,7 +1664,25 @@ function FormField({ label, name, type = 'text', value, onChange, placeholder, r
         placeholder={placeholder}
         required={required}
         disabled={disabled}
+        {...inputProps}
         className="w-full rounded-[18px] border border-[#dce5dd] bg-white px-4 py-3 text-[#4E5C57] outline-none focus:border-[#76A88E] focus:ring-4 focus:ring-[#76A88E]/15 transition disabled:bg-[#f1f4f2] disabled:text-[#9aa8a2]"
+      />
+    </label>
+  )
+}
+
+function TextAreaField({ label, name, value, onChange, placeholder, required, rows = 3 }) {
+  return (
+    <label className="block">
+      <span className="block text-sm font-semibold text-[#5f746c] mb-2">{label}</span>
+      <textarea
+        name={name}
+        value={value}
+        onChange={onChange}
+        placeholder={placeholder}
+        required={required}
+        rows={rows}
+        className="w-full resize-y rounded-[18px] border border-[#dce5dd] bg-white px-4 py-3 text-[#4E5C57] outline-none focus:border-[#76A88E] focus:ring-4 focus:ring-[#76A88E]/15 transition"
       />
     </label>
   )

@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:local": "npx --yes netlify-cli@26.1.0 dev --command \"npm run dev -- --host 127.0.0.1 --port 5173 --strictPort\" --target-port 5173 --port 8888",
     "build": "vite build",
     "preview": "vite preview"
   },

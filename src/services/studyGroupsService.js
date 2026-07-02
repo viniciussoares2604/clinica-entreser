@@ -55,7 +55,64 @@ export async function createStudyGroupEnrollment({ studyGroup, participant }) {
   return payload
 }
 
-export async function createMonthlyPixEnrollment({ studyGroup, participant }) {
+async function requestManageStudyGroup(method, payload) {
+  const adminToken = window.localStorage.getItem('entreser-admin-token')
+  const response = await fetch('/.netlify/functions/manage-study-group', {
+    method,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${adminToken || ''}`,
+    },
+    body: JSON.stringify(payload),
+  })
+
+  const data = await response.json().catch(() => ({}))
+
+  if (!response.ok) {
+    throw new Error(data.error || 'Não foi possível salvar o curso.')
+  }
+
+  return data
+}
+
+export async function createStudyGroup(groupData) {
+  return requestManageStudyGroup('POST', groupData)
+}
+
+export async function updateStudyGroup(groupData) {
+  return requestManageStudyGroup('PUT', groupData)
+}
+
+export async function deleteStudyGroup(groupId) {
+  return requestManageStudyGroup('DELETE', { id: groupId })
+}
+
+export async function uploadStudyGroupImage(file) {
+  if (!hasSupabaseConfig) {
+    throw new Error('Supabase não está configurado para upload de imagens.')
+  }
+
+  const safeFileName = `${Date.now()}-${file.name.replace(/[^a-zA-Z0-9\.\-_]/g, '-')}`
+  const { data, error } = await supabase.storage
+    .from('study-group-images')
+    .upload(safeFileName, file, { upsert: true })
+
+  if (error) {
+    throw new Error(error.message)
+  }
+
+  const { data: publicUrlData, error: publicUrlError } = await supabase.storage
+    .from('study-group-images')
+    .getPublicUrl(safeFileName)
+
+  if (publicUrlError) {
+    throw new Error(publicUrlError.message)
+  }
+
+  return publicUrlData.publicUrl
+}
+
+export async function createStudyGroupPixEnrollment({ studyGroup, participant }) {
   const response = await fetch('/.netlify/functions/create-monthly-pix-enrollment', {
     method: 'POST',
     headers: {
@@ -76,6 +133,8 @@ export async function createMonthlyPixEnrollment({ studyGroup, participant }) {
   return payload
 }
 
+export const createMonthlyPixEnrollment = createStudyGroupPixEnrollment
+
 function mapStudyGroupFromSupabase(group) {
   const media = studyGroupMedia[group.id] || {}
 
@@ -92,6 +151,7 @@ function mapStudyGroupFromSupabase(group) {
     seatsAvailable: group.seats_available,
     priceInCents: group.price_in_cents,
     installmentCount: group.installment_count || media.installmentCount,
+    pixPaymentType: group.pix_payment_type || 'none',
     facilitator: group.facilitator,
     highlights: group.highlights || [],
     bannerImage: group.banner_image || media.bannerImage,

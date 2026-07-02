@@ -2,7 +2,8 @@ alter table public.study_groups
 add column if not exists banner_image text,
 add column if not exists banner_position text,
 add column if not exists contact_whatsapp text,
-add column if not exists installment_count integer not null default 1;
+add column if not exists installment_count integer not null default 1,
+add column if not exists pix_payment_type text not null default 'none';
 
 insert into public.study_groups (
   id,
@@ -17,6 +18,7 @@ insert into public.study_groups (
   seats_available,
   price_in_cents,
   installment_count,
+  pix_payment_type,
   facilitator,
   banner_image,
   banner_position,
@@ -36,6 +38,7 @@ insert into public.study_groups (
     20,
     13000,
     5,
+    'monthly',
     'Lastênia Soares de Lima',
     '/grupo-self-situacao.jpeg',
     'center center',
@@ -55,6 +58,7 @@ insert into public.study_groups (
     20,
     12000,
     5,
+    'monthly',
     'Silvia Barbosa Correia e Antônio Joelmir Portela da Silva',
     '/grupo-psicopatologia-critica.jpeg',
     'center center',
@@ -73,6 +77,7 @@ on conflict (id) do update set
   seats_available = excluded.seats_available,
   price_in_cents = excluded.price_in_cents,
   installment_count = excluded.installment_count,
+  pix_payment_type = excluded.pix_payment_type,
   facilitator = excluded.facilitator,
   banner_image = excluded.banner_image,
   banner_position = excluded.banner_position,
